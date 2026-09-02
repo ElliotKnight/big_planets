@@ -1,0 +1,16 @@
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Exported backups (personal data — don't commit)
+progres-backup-*.json
+goodlife-backup-*.json
+
+# Logs / scratch
+*.log
+node_modules/

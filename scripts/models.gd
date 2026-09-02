@@ -684,7 +684,7 @@ static func _rig_of(n: Node3D) -> Dictionary:
 ## A unit figure: little person in the tribe colour with a type-specific
 ## silhouette (cap, helmet, shield, bow, lance, horse...). The rig dictionary
 ## is stored as meta "rig" on the returned group.
-static func unit_figure(type: String, color: Color, seed_v: int, embarked: bool, vessel: String) -> Node3D:
+static func unit_figure(type: String, color: Color, seed_v: int, embarked: bool, vessel: String, owner_id: int = -1) -> Node3D:
 	var g := Node3D.new()
 	var skin := hex(SKIN[seed_v % SKIN.size()])
 	var steel := mat(hex(0xd7dfee), 0.35, 0.7)
@@ -748,27 +748,15 @@ static func unit_figure(type: String, color: Color, seed_v: int, embarked: bool,
 				rig["hand_r"].add_child(mesh(cyl(0.01, 0.01, 0.5, 5), wood, 0, 0.14, 0))
 				rig["hand_r"].add_child(mesh(cone(0.022, 0.08, 4), steel, 0, 0.43, 0))
 		"catapult":
-			g.add_child(mesh(box(0.4, 0.07, 0.26), wood, 0, 0.1, 0))
-			g.add_child(mesh(box(0.05, 0.22, 0.05), wood, 0.1, 0.24, 0.09))
-			g.add_child(mesh(box(0.05, 0.22, 0.05), wood, 0.1, 0.24, -0.09))
-			g.add_child(mesh(box(0.05, 0.04, 0.24), wood, 0.1, 0.36, 0))
-			for sx in [-1.0, 1.0]:
-				for sz in [-1.0, 1.0]:
-					var wheel := mesh(cyl(0.075, 0.075, 0.035, 10), mat(hex(0x4a3628)), sx * 0.16, 0.075, sz * 0.15)
-					wheel.rotation.x = PI / 2.0
-					g.add_child(wheel)
-			var pivot := Node3D.new()
-			pivot.position = Vector3(0.1, 0.36, 0)
-			var arm := mesh(box(0.035, 0.42, 0.035), wood, -0.12, 0.08, 0)
-			arm.rotation.z = 0.75
-			pivot.add_child(arm)
-			pivot.add_child(mesh(sphere(0.055, 7, 5), mat(hex(0x6e6a66)), -0.3, 0.07, 0))
-			g.add_child(pivot)
+			var cat := Kit.model("siege-catapult", Kit.player_variation(owner_id), 0.3)
+			cat.position = Vector3(0, 0.045, 0)
+			cat.rotation.y = PI / 2.0
+			g.add_child(cat)
 			var crew := figure(color, skin, 0.7, seed_v)
-			crew.position = Vector3(0.24, 0.0, 0.18)
+			crew.position = Vector3(0.2, 0.0, 0.2)
 			g.add_child(crew)
 			g.set_meta("rig", _rig_of(crew))
-			g.set_meta("catapult_arm", pivot)
+			g.set_meta("catapult_arm", cat)
 		_:
 			var fn := figure(color, skin, s, seed_v)
 			var rig := _rig_of(fn)

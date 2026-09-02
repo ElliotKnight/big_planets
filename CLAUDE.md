@@ -31,6 +31,8 @@ scripts/
   glass_panel.gd         Frosted-glass PanelContainer (class GlassPanel)
   tech_tree_panel.gd     Branching tech-tree diagram widget (class TechTreePanel)
   sfx.gd                 Procedurally synthesised sound effects (class Sfx)
+  kit.gd                 Loader for Kenney Castle Kit GLBs with palette variations (class Kit, static)
+assets/kit/              Kenney Castle Kit 2.0 (CC0) GLB models + Textures/colormap.png and variation-a..g.png
 shaders/
   glass.gdshader         Screen-blur panel background
   bar.gdshader           Billboarded HP / population bar
@@ -38,9 +40,10 @@ tests/
   smoke.gd               Headless AI-vs-AI engine test (extends SceneTree)
   debug_train.gd         Headless debugging helper for AI training decisions
 goodlife/                A separate Three.js habit-tracker project. Reference only: the visual style (floating island, low-poly builders, neon UI) is copied from it. Do not modify it.
+kenney_castle-kit/       The raw kit download (FBX/OBJ/GLB/previews). Has a .gdignore so Godot skips it; copy what you need into assets/kit/.
 ```
 
-There are no asset files: all geometry is generated from primitives in `models.gd`, all sounds are synthesised in `sfx.gd`, and the UI is built in code in `main.gd`.
+The only art assets are the Kenney Castle Kit GLBs in `assets/kit/`. Everything else (units, animals, crops, water details) is generated from primitives in `models.gd`, all sounds are synthesised in `sfx.gd`, and the UI is built in code in `main.gd`.
 
 ## Core architecture and conventions
 
@@ -65,6 +68,8 @@ Emit presentation events from `Game` before `changed`. Rules must never depend o
 
 **Rigged units.** `Models.figure()` returns a root with a `rig` meta dictionary (`leg_l`, `leg_r`, `arm_l`, `arm_r`, `hand_l`, `hand_r`, `head`, `torso`, optionally `bow`). Weapons are children of hand nodes; animations tween pivot rotations. In hand-local space, -y points along the arm and +z is up when the arm is raised. Figures face +z; mounted figures (meta `mounted`) face +x, and `_face()` compensates.
 
+**Kit models.** Use `Kit.model(name, variation, scale)` / `Kit.place(...)`; never rely on the material imported inside the GLB (the importer drops the colormap), the loader applies a runtime material from `assets/kit/Textures/`. Tribe accent colours map to palette variations via `Kit.player_variation(pid)` (blue d, red a, green b, yellow c; villages grey e). Kit models are 1 unit per castle tile, so scale to about 0.3 to 0.5 on our 1-unit map tiles. Forest tiles use `tree-large`/`tree-small`, mountains use scaled `rocks-large`/`rocks-small`, cities stack tower pieces by level, City Wall uses `wall`/`wall-corner`, catapult units use `siege-catapult`. Cherry/oak trees and the cottage builders in `models.gd` are no longer used on the map but are kept for reference.
+
 **Balance numbers** live in `defs.gd` (unit stats, tech costs, rewards) and a few constants in `game.gd` (combat formula, healing, scoring). Change them there rather than scattering literals.
 
 ## Naming and style
@@ -80,7 +85,8 @@ Emit presentation events from `Game` before `changed`. Rules must never depend o
 
 - Do not put game rules in `main.gd`, `map_view_3d.gd` or `models.gd`. Do not reach into nodes from `game.gd` or `ai.gd`.
 - Keep AI logic in `scripts/ai.gd`. It must only use public `Game` methods and the same information a player could have (respect `is_explored`).
-- Do not add `.tscn` scenes for units, cities or tiles: everything is generated from code and synced incrementally. Do not add art or audio assets; extend `models.gd` and `sfx.gd` instead.
+- Do not add `.tscn` scenes for units, cities or tiles: everything is generated from code and synced incrementally. Do not add audio assets; extend `sfx.gd`. New 3D art should come from the Kenney kit (`assets/kit/`) or primitives in `models.gd`.
+- Do not `rm -rf` a folder that differs only by case from one you want to keep: the filesystem is case-insensitive (`assets/kit/textures` and `assets/kit/Textures` are the same folder).
 - Do not call `refresh()` from inside an animation step, and do not free unit nodes outside `_die()` / `_sync_units()`.
 - Do not change tile geometry sizes casually: tiles are exactly 1 unit, caps are full width with no gaps (a faint seam line only), and units must always stand in the cleared centre/front of the tile.
 - Do not rename or remove the debug hooks (`BP_SCREENSHOT`, `animations_enabled`); they are how the game is verified without a human.
@@ -97,6 +103,7 @@ GODOT=~/Downloads/Godot.app/Contents/MacOS/Godot
 
 - **Play:** `$GODOT --path .` (or open the folder in the Godot editor and press F5). `F11` toggles fullscreen.
 - **After adding a new `class_name` script:** `$GODOT --headless --path . --import` to refresh the class cache, otherwise you get "Could not find type" parse errors.
+- **Kit contact sheet:** `BP_OUT=/tmp/kit.png $GODOT --path . --script tests/kit_preview.gd --windowed --resolution 1440x900` renders the main kit models with their sizes printed, plus a flag and roof in all seven palette variations.
 - **Engine test (fast, headless):** `$GODOT --headless --path . --script tests/smoke.gd` plays three AI-vs-AI games and asserts unit/tile consistency. Run it after any change to `game.gd`, `ai.gd`, `map_gen.gd` or `defs.gd`. Same seeds give identical results, so a changed result means behaviour changed.
 - **Visual check (no human needed):** `BP_SCREENSHOT=/tmp/shot $GODOT --path . --windowed --resolution 1440x900` auto-plays 8 turns and saves `shot_map.png`, `shot_tech.png`, `shot_levelup.png`, `shot_close.png`, `shot_units.png` (one of each unit type), `shot_archer_draw.png`/`shot_archer_loose.png`, `shot_anim.png` (mid-replay) and `shot_after.png`, then quits. It prints a picking self-test and star-counter reconciliation. macOS has no `timeout`; run it in the background and `kill` after ~90 s if it hangs.
 - There is no unit-test framework; keep `tests/smoke.gd` green and look at the screenshots.

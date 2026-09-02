@@ -107,7 +107,7 @@ From a terminal, the same thing:
 
 **Look and feel**
 
-The presentation borrows the aesthetic of the `goodlife` habit tracker: the map is a floating low-poly island in space, built from flat-shaded primitives with no art assets. Checkerboard grass caps sit on dirt bases; forests are oak, pine and cherry trees; mountains are snow-capped peaks with glowing ore crystals; water tiles are glossy blue slabs with fish. Every tile keeps its centre clear (trees sit at the back of forest tiles, mountains have a front ledge, animal tiles are fenced paddocks with sheep) so units always stand in view. Cities are cottages that gain chimneys, extensions and second floors as they level, with windows glowing in the tribe colour. Around the island: an additive starfield, nebula glows, three alien planets (one ringed, one with a moon) and shooting stars. Lighting is a warm sun with cyan and pink rim lights, ACES tonemapping and bloom. The HUD uses frosted-glass panels in the same dark neon palette.
+Buildings, trees, rocks, flags and siege engines come from Kenney's Castle Kit (CC0, `assets/kit`, credit: www.kenney.nl); its palette-variation textures give each tribe its own roof and flag colour. The rest of the presentation borrows the aesthetic of the `goodlife` habit tracker: the map is a floating low-poly island in space, built from flat-shaded primitives with no art assets. Checkerboard grass caps sit on dirt bases; forests are oak, pine and cherry trees; mountains are snow-capped peaks with glowing ore crystals; water tiles are glossy blue slabs with fish. Every tile keeps its centre clear (trees sit at the back of forest tiles, mountains have a front ledge, animal tiles are fenced paddocks with sheep) so units always stand in view. Cities are cottages that gain chimneys, extensions and second floors as they level, with windows glowing in the tribe colour. Around the island: an additive starfield, nebula glows, three alien planets (one ringed, one with a moon) and shooting stars. Lighting is a warm sun with cyan and pink rim lights, ACES tonemapping and bloom. The HUD uses frosted-glass panels in the same dark neon palette.
 
 **Animation and sound**
 
@@ -129,7 +129,8 @@ Every game event is queued and replayed as an animation. Units are rigged little
 | `scripts/map_gen.gd` | Procedural island map, capitals, villages and resources. |
 | `scripts/game.gd` | Rules engine: turns, stars, cities, movement, combat, capture, tech, scoring. |
 | `scripts/ai.gd` | Greedy AI opponent. |
-| `scripts/models.gd` | Low-poly mesh factory: trees, houses, mountains, sheep, units, walls. |
+| `scripts/models.gd` | Low-poly mesh factory: rigged units, sheep, crops, fruit, water details. |
+| `scripts/kit.gd`, `assets/kit/` | Kenney Castle Kit loader and models (trees, castles, walls, flags, rocks, siege). |
 | `scripts/space.gd` | Space backdrop: stars, nebulae, planets, shooting stars. |
 | `scripts/map_view_3d.gd` | 3D island, lighting, highlights, orbit camera and tile picking. |
 | `scripts/ui_theme.gd`, `scripts/glass_panel.gd`, `shaders/` | Neon glass UI theme and shaders. |

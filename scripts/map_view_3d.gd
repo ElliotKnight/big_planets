@@ -5,7 +5,7 @@ extends Node3D
 ## Game events are queued and replayed as animations (so AI turns are visible);
 ## the full state sync is deferred until the queue drains.
 
-const GRASS := [0x3fb268, 0x349b57]
+const GRASS := [0x8ade9f, 0x76cf8d]
 const GHOST := Color(0.078, 0.078, 0.165, 0.72)
 
 var game: Game = null
@@ -259,12 +259,25 @@ func _build_tile(t: Tile) -> Node3D:
 	if t.city != null:
 		_build_city(g, t, owner_col)
 	elif t.terrain == Defs.Terrain.MOUNTAIN:
-		var m := Models.mountain(rng, t.resource == Defs.Res.METAL and t.improvement == Defs.Improvement.NONE)
-		m.position = Vector3(-0.08, 0, -0.16)
-		m.scale = Vector3(0.88, 0.9, 0.82)
-		g.add_child(m)
+		var big := Kit.model("rocks-large", "", 1.0)
+		big.scale = Vector3(0.66, 1.55, 0.64)
+		big.position = Vector3(-0.1, 0, -0.16)
+		big.rotation.y = rng.randf() * TAU
+		g.add_child(big)
+		var small := Kit.model("rocks-small", "", 1.0)
+		small.scale = Vector3(0.5, 0.95, 0.5)
+		small.position = Vector3(0.28, 0, -0.26)
+		small.rotation.y = rng.randf() * TAU
+		g.add_child(small)
+		if t.resource == Defs.Res.METAL and t.improvement == Defs.Improvement.NONE:
+			var crystal := Models.glow(Models.hex(0xd9e4ff), 1.3)
+			for i in 3:
+				var a := 1.0 + i * 2.0
+				var c := Models.mesh(Models.cone(0.045, 0.16, 4), crystal, cos(a) * 0.3 - 0.05, 0.1, sin(a) * 0.26 - 0.1)
+				c.rotation.z = rng.randf_range(-0.4, 0.4)
+				g.add_child(c)
 		# Flat rock ledge at the front where units stand.
-		g.add_child(Models.mesh(Models.box(0.56, 0.07, 0.4), Models.mat(Models.hex(0x5a5652)), 0.06, 0.035, 0.22))
+		g.add_child(Models.mesh(Models.box(0.56, 0.07, 0.4), Models.mat(Models.hex(0x9a9fc4)), 0.06, 0.035, 0.22))
 		if t.improvement == Defs.Improvement.MINE:
 			var mine := Models.mine()
 			mine.position = Vector3(-0.3, 0, 0.02)
@@ -279,13 +292,11 @@ func _build_tile(t: Tile) -> Node3D:
 		if t.resource == Defs.Res.ANIMAL:
 			count = 0  # open pasture: sheep only, no trees
 		for i in count:
-			var r := rng.randf()
-			var variant := 2 if r < 0.1 else (1 if r < 0.4 else 0)
-			var tr := Models.tree(variant, 3 + rng.randi_range(0, 2), owner_col if oid >= 0 else Models.hex(0xffd166))
+			var tr := Kit.model("tree-large" if rng.randf() < 0.6 else "tree-small", "", 1.0)
 			var sp: Vector2 = spots[i] + Vector2(rng.randf_range(-0.03, 0.03), rng.randf_range(-0.03, 0.03))
 			tr.position = Vector3(sp.x, 0, sp.y)
 			tr.rotation.y = rng.randf() * TAU
-			tr.scale = Vector3.ONE * rng.randf_range(0.78, 0.92) * (0.72 if occupied else 1.0)
+			tr.scale = Vector3.ONE * rng.randf_range(0.36, 0.44) * (0.72 if occupied else 1.0)
 			g.add_child(tr)
 			_animate(g, tr, "tree", rng.randf() * TAU)
 		if t.resource == Defs.Res.ANIMAL:
@@ -294,10 +305,10 @@ func _build_tile(t: Tile) -> Node3D:
 				g.add_child(sh)
 				_animate(g, sh, "sheep", rng.randf() * TAU)
 		if t.improvement == Defs.Improvement.LUMBER_HUT:
-			var hut := Models.lumber_hut()
-			hut.position = Vector3(0.24, 0, 0.26)
-			hut.scale = Vector3(0.8, 0.8, 0.8)
-			g.add_child(hut)
+			g.add_child(Kit.place("tree-trunk", "", 0.5, Vector3(0.3, 0, 0.12), rng.randf() * TAU))
+			for i in 3:
+				var lg := Kit.place("tree-log", "", 0.36, Vector3(0.2 + (i % 2) * 0.09, 0.05 + (i / 2) * 0.09, 0.32), 0.3)
+				g.add_child(lg)
 	else:
 		if t.improvement == Defs.Improvement.FARM:
 			g.add_child(Models.farm())
@@ -323,16 +334,48 @@ func _build_tile(t: Tile) -> Node3D:
 
 func _build_city(g: Node3D, t: Tile, owner_col: Color) -> void:
 	var c: City = t.city
-	var accent := owner_col if not c.is_village() else Models.hex(0xffd166)
-	var b := Models.city_building(c.level, accent, c.is_village(), c.is_capital and not c.is_village())
-	g.add_child(b)
-	if c.has_walls:
-		g.add_child(Models.walls(accent))
-	if not c.is_village():
-		var bn := Models.banner(owner_col)
-		bn.position = Vector3(-0.36, 0, 0.3)
-		g.add_child(bn)
-		_animate(g, bn, "banner", randf() * TAU)
+	var v := Kit.player_variation(c.owner_id)
+	if c.is_village():
+		g.add_child(Kit.place("tower-square-base", v, 0.5, Vector3(0, 0, -0.06)))
+		g.add_child(Kit.place("tower-hexagon-top", v, 0.5, Vector3(0, 0.5, -0.06)))
+	else:
+		var keep := Node3D.new()
+		keep.position = Vector3(0, 0, -0.08)
+		match c.level:
+			1:
+				keep.add_child(Kit.place("tower-square", v, 0.48, Vector3.ZERO))
+			2:
+				keep.add_child(Kit.place("tower-square-base", v, 0.48, Vector3.ZERO))
+				keep.add_child(Kit.place("tower-square-top-roof-high", v, 0.48, Vector3(0, 0.48, 0)))
+			3:
+				keep.add_child(Kit.place("tower-hexagon-base", v, 0.5, Vector3.ZERO))
+				keep.add_child(Kit.place("tower-hexagon-roof", v, 0.5, Vector3(0, 0.655, 0)))
+			4:
+				keep.add_child(Kit.place("tower-hexagon-base", v, 0.5, Vector3.ZERO))
+				keep.add_child(Kit.place("tower-hexagon-mid", v, 0.5, Vector3(0, 0.655, 0)))
+				keep.add_child(Kit.place("tower-hexagon-roof", v, 0.5, Vector3(0, 0.885, 0)))
+			_:
+				keep.add_child(Kit.place("tower-hexagon-base", v, 0.5, Vector3.ZERO))
+				keep.add_child(Kit.place("tower-hexagon-mid", v, 0.5, Vector3(0, 0.655, 0)))
+				keep.add_child(Kit.place("tower-hexagon-roof", v, 0.5, Vector3(0, 0.885, 0)))
+				keep.add_child(Kit.place("tower-square", v, 0.3, Vector3(0.34, 0, -0.2)))
+				keep.add_child(Kit.place("tower-square", v, 0.3, Vector3(-0.34, 0, -0.2)))
+		g.add_child(keep)
+		if c.is_capital:
+			g.add_child(Kit.place("flag-banner-long", v, 0.32, Vector3(-0.36, 0, -0.34)))
+		if c.has_walls:
+			# Stone walls on three sides, corners at the front, gateway open for units.
+			var ws := 0.3
+			for x in [-0.35, 0.0, 0.35]:
+				g.add_child(Kit.place("wall", v, ws, Vector3(x, 0, -0.43)))
+			for z in [-0.35, 0.0, 0.35]:
+				g.add_child(Kit.place("wall", v, ws, Vector3(-0.43, 0, z), PI / 2.0))
+				g.add_child(Kit.place("wall", v, ws, Vector3(0.43, 0, z), PI / 2.0))
+			g.add_child(Kit.place("wall-corner", v, ws, Vector3(-0.38, 0, 0.4)))
+			g.add_child(Kit.place("wall-corner", v, ws, Vector3(0.38, 0, 0.4), PI / 2.0))
+		var fl := Kit.place("flag", v, 0.45, Vector3(-0.36, 0, 0.3))
+		g.add_child(fl)
+		_animate(g, fl, "banner", randf() * TAU)
 	var label := Label3D.new()
 	label.text = c.city_name if c.is_village() else "%s  %d" % [c.city_name, c.level]
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -342,15 +385,14 @@ func _build_city(g: Node3D, t: Tile, owner_col: Color) -> void:
 	label.modulate = Color.WHITE if not c.is_village() else Color(0.85, 0.85, 0.9)
 	label.outline_modulate = Color(owner_col.darkened(0.6), 0.9) if not c.is_village() else Color(0, 0, 0, 0.8)
 	label.no_depth_test = true
-	label.position = Vector3(0, 1.05, 0)
+	label.position = Vector3(0, 1.15, 0)
 	g.add_child(label)
 	if not c.is_village():
-		var bar := Models.mesh(Models.quad(0.6, 0.07), Models.bar_material(Models.hex(0xffd166)), 0, 0.9, 0, false)
+		var bar := Models.mesh(Models.quad(0.6, 0.07), Models.bar_material(Models.hex(0xffd166)), 0, 1.0, 0, false)
 		bar.material_override.set_shader_parameter("frac", float(c.pop) / float(c.pop_needed()))
 		g.add_child(bar)
 
 
-## Faint grid lines along the north and west edges (no gaps between tiles).
 func _add_seams(g: Node3D, top: float) -> void:
 	var m := Models.glass(Color(0.0, 0.0, 0.05, 0.28))
 	g.add_child(Models.mesh(Models.box(1.0, 0.004, 0.022), m, 0, top + 0.003, -0.5, false))
@@ -432,7 +474,7 @@ func _update_unit_status(u: Unit, entry: Dictionary, hp_override: int = -1) -> v
 func _make_unit_node(u: Unit, sig: String) -> Dictionary:
 	var node := Node3D.new()
 	var col: Color = game.players[u.owner_id].color
-	var fig := Models.unit_figure(u.type, col, u.id, u.embarked, u.vessel)
+	var fig := Models.unit_figure(u.type, col, u.id, u.embarked, u.vessel, u.owner_id)
 	fig.rotation.y = (0.6 if u.owner_id == 0 else 2.7) - (PI / 2.0 if fig.get_meta("mounted", false) else 0.0)
 	node.add_child(fig)
 	var ring := Models.mesh(Models.torus(0.02, 0.24), Models.glow(col, 1.5), 0, 0.02, 0, false)
@@ -820,7 +862,7 @@ func _ranged_shot(tw: Tween, entry: Dictionary, from_w: Vector3, to_w: Vector3, 
 	var cat_arm: Node3D = fig.get_meta("catapult_arm", null)
 	if cat_arm != null:
 		proj = Models.mesh(Models.sphere(0.06, 7, 5), Models.mat(Models.hex(0x6e6a66)), 0, 0, 0, false)
-		tw.tween_property(cat_arm, "rotation:z", -1.5, 0.12 * speed).set_ease(Tween.EASE_IN)
+		tw.tween_property(cat_arm, "rotation:x", -0.35, 0.12 * speed).set_ease(Tween.EASE_IN)
 	tw.tween_callback(func():
 		proj.position = from_w + Vector3(0, 0.35, 0)
 		_anim_root.add_child(proj))
@@ -828,7 +870,7 @@ func _ranged_shot(tw: Tween, entry: Dictionary, from_w: Vector3, to_w: Vector3, 
 	tw.tween_callback(proj.queue_free)
 	tw.tween_callback(on_hit)
 	if cat_arm != null:
-		tw.tween_property(cat_arm, "rotation:z", 0.0, 0.4 * speed)
+		tw.tween_property(cat_arm, "rotation:x", 0.0, 0.4 * speed).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 
 ## Appends a melee strike to tw: raise the weapon arm, lunge, chop, recover.

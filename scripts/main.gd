@@ -141,11 +141,7 @@ func _debug_screenshots(prefix: String) -> void:
 	map_view.az = 0.25
 	map_view.pol = 1.05
 	map_view.dist = 5.2
-	map_view.camera.position = Vector3(0, 0, 0)
-	map_view._apply_cam()
-	var focus := map_view.world_pos(cap.x, y0)
-	map_view.camera.position = focus + Vector3(map_view.dist * sin(map_view.pol) * sin(map_view.az), map_view.dist * cos(map_view.pol), map_view.dist * sin(map_view.pol) * cos(map_view.az))
-	map_view.camera.look_at(focus + Vector3(0, 0.3, 0))
+	map_view.focus_tile(cap.x, y0)
 	for i in 8:
 		await get_tree().process_frame
 	get_viewport().get_texture().get_image().save_png(prefix + "_units.png")
@@ -173,7 +169,7 @@ func _debug_screenshots(prefix: String) -> void:
 	map_view.dist = game.size * 1.15 + 3.0
 	map_view.az = 0.55
 	map_view.pol = 0.95
-	map_view._apply_cam()
+	map_view.set_focus(Vector3.ZERO)
 	# Now play one turn with animations on and capture mid-replay.
 	_clear_selection()
 	map_view.dist *= 1.5
@@ -328,7 +324,7 @@ func _build_ui() -> void:
 	log_panel.add(log_label)
 
 	# Hint, bottom-right.
-	var hint := _label("drag to orbit  ·  scroll to zoom  ·  Tab cycles units  ·  F11 fullscreen", 11, UITheme.DIM)
+	var hint := _label("drag to orbit  ·  shift-drag / WASD to pan  ·  scroll to zoom  ·  C recentres  ·  Tab cycles units  ·  F11 fullscreen", 11, UITheme.DIM)
 	root.add_child(hint)
 	hint.anchor_left = 1.0
 	hint.anchor_right = 1.0
@@ -555,6 +551,7 @@ func _cycle_units() -> void:
 	if sel_unit != null and mine.has(sel_unit):
 		idx = (mine.find(sel_unit) + 1) % mine.size()
 	_select_unit(mine[idx])
+	map_view.focus_tile(sel_unit.x, sel_unit.y)
 	_refresh()
 
 

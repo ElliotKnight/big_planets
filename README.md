@@ -119,6 +119,8 @@ Every game event is queued and replayed as an animation. Units are rigged little
 - Click a tile inside your borders to see harvest/build actions in the right panel. Click a city to train units.
 - A unit that starts its turn on a village or enemy city can **Capture** it from the right panel.
 - Drag with the left mouse button to orbit the island, scroll (or pinch) to zoom, arrow keys also orbit.
+- The camera zooms towards whatever is under the cursor, so you can scroll straight into a corner of the map.
+- Pan the view with `shift`+drag, a middle-mouse drag, `WASD`, or a two-finger trackpad scroll; `C` recentres on the whole island.
 - `Space` ends the turn, `T` opens the tech tree, `Tab` cycles idle units, `Esc`/right-click clears the selection, `F11` toggles fullscreen.
 
 **Layout**

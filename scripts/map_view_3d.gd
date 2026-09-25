@@ -18,8 +18,13 @@ var pol: float = 0.95
 var dist: float = 14.0
 var min_dist: float = 6.0
 var max_dist: float = 40.0
+## Ground point the camera orbits and looks at. Panning moves it, so any part
+## of the island (not just the centre) can be brought into view and zoomed in on.
+var focus: Vector3 = Vector3.ZERO
+var pan_limit: float = 12.0
 
 var _dragging := false
+var _panning := false
 var _drag_moved := false
 var _down := Vector2.ZERO
 var _last := Vector2.ZERO
@@ -45,8 +50,10 @@ func setup(g: Game, c) -> void:
 	ctrl = c
 	off = (g.size - 1) / 2.0
 	dist = g.size * 1.5 + 3.5
-	min_dist = g.size * 0.45
+	min_dist = maxf(1.6, g.size * 0.25)
 	max_dist = g.size * 2.6
+	pan_limit = g.size * 0.5 + 2.0
+	focus = Vector3.ZERO
 	var s := maxf(1.0, g.size / 8.0)
 	_build_environment(s)
 	_space = SpaceBackdrop.new()
@@ -164,8 +171,30 @@ func _build_environment(s: float) -> void:
 
 
 func _apply_cam() -> void:
-	camera.position = Vector3(dist * sin(pol) * sin(az), dist * cos(pol), dist * sin(pol) * cos(az))
-	camera.look_at(Vector3(0, 0.3, 0))
+	camera.position = focus + Vector3(dist * sin(pol) * sin(az), dist * cos(pol), dist * sin(pol) * cos(az))
+	camera.look_at(focus + Vector3(0, 0.3, 0))
+	camera.force_update_transform()
+
+
+## Move the orbit/look-at point, kept within a margin around the island.
+func set_focus(p: Vector3) -> void:
+	focus = Vector3(clampf(p.x, -pan_limit, pan_limit), 0.0, clampf(p.z, -pan_limit, pan_limit))
+	_apply_cam()
+
+
+## Centre the view on a tile (used when selection jumps somewhere off-screen).
+func focus_tile(x: int, y: int) -> void:
+	if game == null or camera == null:
+		return
+	set_focus(world_pos(x, y))
+
+
+## Back to the default framing of the whole island.
+func reset_view() -> void:
+	az = 0.55
+	pol = 0.95
+	dist = game.size * 1.5 + 3.5 if game != null else 14.0
+	set_focus(Vector3.ZERO)
 
 
 # ---------------------------------------------------------------- refresh
@@ -1054,15 +1083,23 @@ func _play_stars(step: Dictionary, speed: float) -> void:
 
 # ---------------------------------------------------------------- input & picking
 
-func tile_from_screen(pos: Vector2) -> Vector2i:
+## Where a screen point hits the ground plane, or null if it misses it.
+func ground_point(pos: Vector2) -> Variant:
 	var from := camera.project_ray_origin(pos)
 	var dir := camera.project_ray_normal(pos)
 	if absf(dir.y) < 1e-5:
-		return Vector2i(-1, -1)
+		return null
 	var t := -from.y / dir.y
 	if t < 0.0:
+		return null
+	return from + dir * t
+
+
+func tile_from_screen(pos: Vector2) -> Vector2i:
+	var hit = ground_point(pos)
+	if hit == null:
 		return Vector2i(-1, -1)
-	var p := from + dir * t
+	var p: Vector3 = hit
 	return Vector2i(roundi(p.x + off), roundi(p.z + off))
 
 
@@ -1080,37 +1117,53 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				_dragging = true
+				_panning = event.shift_pressed
 				_drag_moved = false
 				_down = event.position
 				_last = event.position
 			else:
 				_dragging = false
+				_panning = false
 				if not _drag_moved and ctrl != null:
 					var tp := tile_from_screen(event.position)
 					ctrl.on_tile_click(tp.x, tp.y, false)
+		elif event.button_index == MOUSE_BUTTON_MIDDLE:
+			_dragging = event.pressed
+			_panning = event.pressed
+			_drag_moved = event.pressed
+			_down = event.position
+			_last = event.position
 		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and ctrl != null:
 			var tp := tile_from_screen(event.position)
 			ctrl.on_tile_click(tp.x, tp.y, true)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
-			_zoom(0.9)
+			_zoom(0.9, event.position)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
-			_zoom(1.1)
+			_zoom(1.1, event.position)
 	elif event is InputEventMouseMotion:
 		if _dragging:
 			if event.position.distance_to(_down) > 6.0:
 				_drag_moved = true
 			if _drag_moved:
-				az -= (event.position.x - _last.x) * 0.006
-				pol = clampf(pol - (event.position.y - _last.y) * 0.004, 0.35, 1.4)
-				_apply_cam()
+				if _panning:
+					_drag_pan(_last, event.position)
+				else:
+					az -= (event.position.x - _last.x) * 0.006
+					pol = clampf(pol - (event.position.y - _last.y) * 0.004, 0.35, 1.4)
+					_apply_cam()
 			_last = event.position
 		else:
 			set_hover(tile_from_screen(event.position))
 	elif event is InputEventPanGesture:
-		_zoom(1.0 + event.delta.y * 0.04)
+		# Trackpad two-finger scroll pans the map; hold Ctrl (or pinch) to zoom.
+		if event.ctrl_pressed:
+			_zoom(1.0 + event.delta.y * 0.04, event.position)
+		else:
+			_pan_by(event.delta.x * dist * 0.02, -event.delta.y * dist * 0.02)
 	elif event is InputEventMagnifyGesture:
-		_zoom(1.0 / event.factor)
+		_zoom(1.0 / event.factor, event.position)
 	elif event is InputEventKey and event.pressed:
+		var step := maxf(0.5, dist * 0.07)
 		match event.keycode:
 			KEY_LEFT:
 				az += 0.12
@@ -1124,12 +1177,53 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_DOWN:
 				pol = clampf(pol + 0.08, 0.35, 1.4)
 				_apply_cam()
+			KEY_W:
+				_pan_by(0.0, -step)
+			KEY_S:
+				_pan_by(0.0, step)
+			KEY_A:
+				_pan_by(-step, 0.0)
+			KEY_D:
+				_pan_by(step, 0.0)
+			KEY_C:
+				reset_view()
 			KEY_MINUS:
 				_zoom(1.15)
 			KEY_EQUAL:
 				_zoom(0.87)
 
 
-func _zoom(factor: float) -> void:
+## Zoom towards the ground point under `anchor` (screen space) so the tile the
+## cursor is over stays put; without an anchor it zooms on the current focus.
+func _zoom(factor: float, anchor = null) -> void:
+	var before = ground_point(anchor) if anchor != null else null
 	dist = clampf(dist * factor, min_dist, max_dist)
 	_apply_cam()
+	if before == null:
+		return
+	var after = ground_point(anchor)
+	if after == null:
+		return
+	var shift: Vector3 = before - after
+	set_focus(focus + shift)
+
+
+## Slide the view in camera-relative ground directions (right / forward).
+func _pan_by(right: float, forward: float) -> void:
+	var b := camera.global_transform.basis
+	var r := Vector3(b.x.x, 0.0, b.x.z).normalized()
+	var f := Vector3(-b.z.x, 0.0, -b.z.z)
+	if f.length() < 1e-4:
+		f = Vector3(r.z, 0.0, -r.x)
+	f = f.normalized()
+	set_focus(focus + r * right + f * forward)
+
+
+## Drag the ground itself: the point grabbed stays under the cursor.
+func _drag_pan(from_pos: Vector2, to_pos: Vector2) -> void:
+	var a = ground_point(from_pos)
+	var b = ground_point(to_pos)
+	if a == null or b == null:
+		return
+	var delta: Vector3 = a - b
+	set_focus(focus + delta)
